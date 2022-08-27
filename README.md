@@ -1,5 +1,2 @@
 # payment-backend
-# payment-backend
-# payment-backend
-# grad-backend
-# grad-backend
+hosted link: https://grad-payment-backend.herokuapp.com/api/users/register
