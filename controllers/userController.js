@@ -3,16 +3,18 @@ const User = require("../models/userModel");
 const asyncHandler = require("express-async-handler");
 const jwt = require("jsonwebtoken");
 
-const createToken = ({ id, role, email }) => {
-  return jwt.sign({ id, role, email }, process.env.JWT_SECRET, {
-    expiresIn: "30m",
+// generating token
+const generateToken = (id, role) => {
+  return jwt.sign({ id, role }, process.env.JWT_SECRET, {
+    expiresIn: "1d",
   });
 };
 
+// register user
 const handleNewUser = asyncHandler(async (req, res) => {
-  const { email, password } = req.body;
-  if (!email || !password)
-    return res.status(400).json({ message: "Email and password are required" });
+  const { email, password, name } = req.body;
+  if (!email || !password || !name)
+    return res.status(400).json("Email, name and password are required");
 
   // check if user exist in database
   const duplicate = await User.findOne({ email });
@@ -27,14 +29,71 @@ const handleNewUser = asyncHandler(async (req, res) => {
     const createUser = await User.create({
       email: email,
       password: hashedPwd,
+      name: name,
     });
 
-    return res.status(201).json(createUser);
+    if (createUser) {
+      return res.status(201).json({
+        _id: createUser._id,
+        name: createUser.name,
+        email: createUser.email,
+        token: generateToken(createUser._id, createUser.role),
+      });
+    }
 
     // res.setHeader("Content-Type", "application/json");
   } catch (error) {
     console.log(error);
   }
+});
+
+//login user
+const login = asyncHandler(async (req, res) => {
+  const { email, password } = req.body;
+
+  if (!email || !password)
+    return res.status(400).json({ message: "Email and password are required" });
+
+  //check if user exist
+  const user = await User.findOne({ email });
+  if (!user)
+    return res
+      .status(404)
+      .json({ message: `User with this email is: ${email} not found` });
+
+  try {
+    //Encrypting password
+    const salt = await bcrypt.genSalt(10);
+    const hashedPwd = await bcrypt.hash(password, salt);
+
+    //validating user password
+    const validatePassword = await bcrypt.compare(password, user.password);
+
+    //log user in
+    if (validatePassword) {
+      return res.status(200).json({
+        _id: user._id,
+        email: user.email,
+        name: user.name,
+        token: generateToken(user._id, user.role),
+      });
+    } else {
+      return res.status(409).json({ message: "Invalid credentials" });
+    }
+  } catch (error) {
+    console.log(error);
+  }
+});
+
+// get me
+const getMe = asyncHandler(async (req, res) => {
+  const { _id, name, email } = await User.findById(req.user.id);
+
+  res.status(200).json({
+    _id: _id,
+    name,
+    email,
+  });
 });
 
 //get all users
@@ -46,69 +105,58 @@ const getUsers = asyncHandler(async (req, res) => {
 //update user
 const updateUser = asyncHandler(async (req, res) => {
   const id = req.params.id;
-  const user = await User.findById(id);
+  // const user = await User.findById(id);
+  const user = await User.findById(req.user.id);
+
   if (!user) {
     res.status(404).json({ message: "User not found" });
   }
-  const { email, password } = req.body;
+  const { email, password, name } = req.body;
+
+  if (user._id.toString() !== id && user.role !== "admin") {
+    return res.status(401).json("User not authorized");
+  }
+
   const salt = await bcrypt.genSalt(10);
   const hashedPwd = await bcrypt.hash(password, salt);
 
   const update = await User.findByIdAndUpdate(
     id,
-    { email, password: hashedPwd },
+    { email, name, password: hashedPwd },
     {
       new: true,
     }
   );
   // const users = await User.find();
-  res.status(200).json(update);
+
+  res
+    .status(200)
+    .json({ _id: update._id, email: update.email, name: update.name });
+  // res.status(200).json({ _id: update._id, email: user.email, name: user.name });
 });
 
 //delete user
 const deleteUser = asyncHandler(async (req, res) => {
   const id = req.params.id;
-  const user = await User.findById(id);
+  const user = await User.findById(req.user.id);
+
+  if (user._id.toString() !== id && user.role !== "admin") {
+    return res.status(401).json("User not authorized");
+  }
+
   if (!user) {
-    res.status(404);
-    // throw new Error("User not found");
+    res.status(404).json("User not found");
   }
   await user.remove();
-  const users = await User.find();
-  res.status(200).json(users);
+  // const users = await User.find();
+  res.status(200).json(`User with ${user.email} has been deleted successfully`);
 });
 
-//login user
-const login = asyncHandler(async (req, res) => {
-  const { email, password } = req.body;
-
-  if (!email || !password)
-    return res.status(400).json({ message: "Email and password are required" });
-
-  //check if user exist
-  const isUser = await User.findOne({ email });
-  if (!isUser)
-    return res
-      .status(404)
-      .json({ message: `User with this email is: ${email} not found` });
-
-  try {
-    //Encrypting password
-    const salt = await bcrypt.genSalt(10);
-    const hashedPwd = await bcrypt.hash(password, salt);
-
-    //validating user password
-    const validatePassword = await bcrypt.compare(password, isUser.password);
-
-    //log user in
-    if (validatePassword) {
-      return res.status(200).json(isUser);
-    } else {
-      return res.status(409).json({ message: "Wrong password" });
-    }
-  } catch (error) {
-    console.log(error);
-  }
-});
-
-module.exports = { handleNewUser, getUsers, updateUser, deleteUser, login };
+module.exports = {
+  handleNewUser,
+  getUsers,
+  updateUser,
+  deleteUser,
+  login,
+  getMe,
+};

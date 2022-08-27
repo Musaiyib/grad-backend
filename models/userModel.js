@@ -7,10 +7,15 @@ const userModel = mongoose.Schema({
     unique: true,
     lowercase: true,
   },
+  name: {
+    type: String,
+    lowercase: true,
+    required: true,
+  },
   role: {
     type: String,
     required: true,
-    default: "Basic",
+    default: "user",
   },
   password: {
     type: String,
