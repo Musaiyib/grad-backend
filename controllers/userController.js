@@ -2,6 +2,7 @@ const bcrypt = require("bcryptjs");
 const User = require("../models/userModel");
 const asyncHandler = require("express-async-handler");
 const jwt = require("jsonwebtoken");
+const EmailValidator = require("email-validator");
 
 // generating token
 const generateToken = (id, role) => {
@@ -10,15 +11,23 @@ const generateToken = (id, role) => {
   });
 };
 
+const validateEmail = (val) => {
+  return EmailValidator.validate(val);
+};
+
 // register user
 const handleNewUser = asyncHandler(async (req, res) => {
   const { email, password, name } = req.body;
   if (!email || !password || !name)
     return res.status(400).json("Email, name and password are required");
 
+  // validating email
+  if (validateEmail(email) === false) {
+    return res.status(400).json("Invalid email");
+  }
   // check if user exist in database
   const duplicate = await User.findOne({ email });
-  if (duplicate) return res.status(409).json({ message: "User already exist" });
+  if (duplicate) return res.status(409).json("User already exist");
 
   try {
     // encrypting the password
@@ -40,8 +49,6 @@ const handleNewUser = asyncHandler(async (req, res) => {
         token: generateToken(createUser._id, createUser.role),
       });
     }
-
-    // res.setHeader("Content-Type", "application/json");
   } catch (error) {
     console.log(error);
   }
@@ -53,6 +60,11 @@ const login = asyncHandler(async (req, res) => {
 
   if (!email || !password)
     return res.status(400).json({ message: "Email and password are required" });
+
+  // validating email
+  if (validateEmail(email) === false) {
+    return res.status(400).json("Invalid email");
+  }
 
   //check if user exist
   const user = await User.findOne({ email });
@@ -107,11 +119,16 @@ const updateUser = asyncHandler(async (req, res) => {
   const id = req.params.id;
   // const user = await User.findById(id);
   const user = await User.findById(req.user.id);
+  const { email, password, name } = req.body;
+
+  // validating email
+  if (validateEmail(email) === false) {
+    return res.status(400).json("Invalid email");
+  }
 
   if (!user) {
     res.status(404).json({ message: "User not found" });
   }
-  const { email, password, name } = req.body;
 
   if (user._id.toString() !== id && user.role !== "admin") {
     return res.status(401).json("User not authorized");
