@@ -74,10 +74,6 @@ const login = asyncHandler(async (req, res) => {
       .json({ message: `User with this email is: ${email} not found` });
 
   try {
-    //Encrypting password
-    const salt = await bcrypt.genSalt(10);
-    const hashedPwd = await bcrypt.hash(password, salt);
-
     //validating user password
     const validatePassword = await bcrypt.compare(password, user.password);
 
@@ -118,7 +114,6 @@ const getUsers = asyncHandler(async (req, res) => {
 const updateUser = asyncHandler(async (req, res) => {
   const id = req.params.id;
   // const user = await User.findById(id);
-  const user = await User.findById(req.user.id);
   const { email, password, name } = req.body;
 
   // validating email
@@ -126,11 +121,11 @@ const updateUser = asyncHandler(async (req, res) => {
     return res.status(400).json("Invalid email");
   }
 
-  if (!user) {
+  if (!req.user) {
     res.status(404).json({ message: "User not found" });
   }
 
-  if (user._id.toString() !== id && user.role !== "admin") {
+  if (req.user._id.toString() !== id && req.user.role !== "admin") {
     return res.status(401).json("User not authorized");
   }
 
@@ -155,18 +150,19 @@ const updateUser = asyncHandler(async (req, res) => {
 //delete user
 const deleteUser = asyncHandler(async (req, res) => {
   const id = req.params.id;
-  const user = await User.findById(req.user.id);
 
-  if (user._id.toString() !== id && user.role !== "admin") {
+  if (req.user._id.toString() !== id && req.user.role !== "admin") {
     return res.status(401).json("User not authorized");
   }
 
-  if (!user) {
+  if (!req.user) {
     res.status(404).json("User not found");
   }
-  await user.remove();
+  await req.user.remove();
   // const users = await User.find();
-  res.status(200).json(`User with ${user.email} has been deleted successfully`);
+  res
+    .status(200)
+    .json(`User with ${req.user.email} has been deleted successfully`);
 });
 
 module.exports = {
