@@ -79,6 +79,7 @@ const login = asyncHandler(async (req, res) => {
 
     //log user in
     if (validatePassword) {
+      
       return res.status(200).json({
         _id: user._id,
         email: user.email,

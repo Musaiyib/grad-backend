@@ -19,7 +19,7 @@ const requireAuth = asyncHandler(async (req, res, next) => {
 
       next();
     } catch (error) {
-      res.status(401).json("Not authorized");
+      res.status(401).json("Not authorized or token expires");
     }
   }
 
